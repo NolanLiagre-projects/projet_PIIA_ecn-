@@ -1,0 +1,64 @@
+{
+  "name": "projet-PIIA",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "vscode",
+
+  // Use an NVIDIA GPU when the machine has one, run on CPU otherwise (Macs,
+  // laptops without NVIDIA). If a GPU is present but not picked up, add:
+  //   "runArgs": ["--gpus=all"]
+  "hostRequirements": {
+    "gpu": "optional"
+  },
+
+  // Downloaded models live on a named Docker volume: they survive a rebuild,
+  // are shared between rebuilds of this container, and can never be
+  // committed to git by mistake (they are not in the repo folder).
+  "mounts": [
+    "source=ollama-models,target=/home/vscode/.ollama,type=volume"
+  ],
+
+  "containerEnv": {
+    // Listen on the container's loopback only: nothing outside the
+    // container can reach the model server.
+    "OLLAMA_HOST": "127.0.0.1:11434",
+    // Local-only mode: refuses Ollama's ":cloud" models, which would send
+    // prompts to ollama.com. Logs show "Ollama cloud disabled: true".
+    "OLLAMA_NO_CLOUD": "1",
+    // Small, predictable memory use: one model loaded, 8k context (plenty
+    // for classifying short texts). Up to 4 requests served at once, so
+    // sending requests in parallel actually speeds things up; each slot
+    // adds its own KV cache, cheap with a 1b model.
+    "OLLAMA_MAX_LOADED_MODELS": "1",
+    "OLLAMA_NUM_PARALLEL": "4",
+    "OLLAMA_CONTEXT_LENGTH": "8192",
+    // Model pulled on first create: small (~800 MB, 4-bit) and fast, so the
+    // whole pipeline runs quickly. Others are pulled by hand with
+    // `ollama pull <model>`.
+    "OLLAMA_DEFAULT_MODEL": "gemma3:1b"
+  },
+
+  // VS Code would otherwise auto-forward the Ollama port to the host,
+  // exposing it outside the container. Keep it inside.
+  "portsAttributes": {
+    "11434": { "onAutoForward": "ignore" }
+  },
+
+  // Create: start Ollama and download the model (once, a few GB).
+  // Start: restart Ollama each time the container starts.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/start-ollama.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python"
+      }
+    }
+  }
+}
